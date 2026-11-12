@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Ledger
+## Notes: Read-only auction house portfolio tracker (purchases, sales, prices, holdings, P/L). Prices from AHDB and/or Auctionator
+## Author: Polaris Minties
+## Version: 0.9.0
+## OptionalDeps: Auctionator, AuctionDB, GearQuestForever
+## SavedVariables: LedgerDB
+## IconTexture: Interface\Icons\INV_Misc_Book_11
+
+Core.lua
+Live.lua
+Craft.lua
+UI.lua
