@@ -734,9 +734,11 @@ local vNameRetry, vNameTries = false, 0
 
 -- name (and clickable link) if the client has the item loaded
 local function ItemNameLink(id)
-  if GetItemInfo then
-    local ok, name, link = pcall(GetItemInfo, id)
-    if ok and name then return name, link end
+  for _, getInfo in ipairs({C_Item and C_Item.GetItemInfo or false, GetItemInfo or false}) do
+    if getInfo then
+      local ok, name, link = pcall(getInfo, id)
+      if ok and name then return name, link end
+    end
   end
   if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
   return nil, nil
@@ -1196,8 +1198,8 @@ local function RefreshBank()
   local missingName = d.loading > 0
   for _, r in ipairs(d.rows) do
     local name = ItemNameLink(r.id)
-    if not name then missingName = true end
-    r.name = name or ("item " .. r.id)
+    if not (name or r.name) then missingName = true end
+    r.name = name or r.name or ("item " .. r.id)
   end
   local ui = db.ui
   local key = ui.bSortKey or "value"

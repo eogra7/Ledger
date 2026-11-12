@@ -961,10 +961,15 @@ end
 local function SellPrice(itemID)
   local fix = ns.VendorFix(itemID)
   if fix ~= nil then return fix end
-  if not GetItemInfo then return nil end
   -- GetItemInfo's 11th return is sellPrice; pcall adds "ok" in front.
-  local ok, name, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, itemID)
-  if ok and name then return tonumber(sell) or 0 end
+  -- Newer clients have C_Item.GetItemInfo, and the global may give nothing there.
+  local sources = {}
+  if C_Item and C_Item.GetItemInfo then sources[#sources + 1] = C_Item.GetItemInfo end
+  if GetItemInfo then sources[#sources + 1] = GetItemInfo end
+  for _, getInfo in ipairs(sources) do
+    local ok, name, _, _, _, _, _, _, _, _, _, sell = pcall(getInfo, itemID)
+    if ok and name then return tonumber(sell) or 0 end
+  end
   if C_Item and C_Item.RequestLoadItemDataByID then
     pcall(C_Item.RequestLoadItemDataByID, itemID)
   end
@@ -999,7 +1004,7 @@ function ns.BankValue(includeBags)
   if includeBags then add(db.bagItems) end
   db.vendor = db.vendor or {}
   for id, e in pairs(merged) do
-    local r = {id = id, n = e.n, bound = e.bound}
+    local r = {id = id, n = e.n, bound = e.bound, name = GetItemNameSafe(id)}
     local vend = db.vendor[id]
     if vend == nil then
       vend = SellPrice(id)

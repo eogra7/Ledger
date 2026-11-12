@@ -3,7 +3,7 @@
 local dir = (arg and arg[0] and arg[0]:match("^(.*)[/\\]")) or "tests"
 package.path = dir .. "/?.lua;" .. package.path
 
-local FILES = {"test_portfolio", "test_craft"}
+local FILES = {"test_portfolio", "test_craft", "test_bank"}
 
 local T = {}
 function T.eq(got, want, what)

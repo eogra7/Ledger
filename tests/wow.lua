@@ -54,6 +54,10 @@ function W.load(opts)
   function GetItemCount() return 0 end
   SlashCmdList = {}
   Auctionator, GearQuest, AuctionDB = nil, opts.gearquest, nil
+  -- opts.client = {GetItemInfo = fn|false, C_Item = table}: stand in for other game clients
+  local client = opts.client or {}
+  if client.GetItemInfo ~= nil then GetItemInfo = client.GetItemInfo or nil end
+  C_Item = client.C_Item
   local items = {}
   for id, p in pairs(W.PRICES) do items[id] = string.format("%d,%d,%d,%d", W.NOW - 60, p, p, 20) end
   AuctionDBForeverSaved = {houses = {Alliance = {items = items, daily = {}, scans = {{W.NOW - 60, 100, 10}}}}}
