@@ -18,20 +18,11 @@ local MAIL_LIFETIME = 30 * 24 * 60 * 60
 local MATCH_TOLERANCE = 30 * 60      -- seconds of slack when re-identifying a mail
 local CLICK_KEEP = 7 * 24 * 60 * 60  -- keep observed purchase clicks for a week
 
--- {itemID, name, category, qty, total cost in copper}
-local SEED = {
-  {4338,  "Mageweave Cloth",     "Cloth",         6, 4788},
-  {4306,  "Silk Cloth",          "Cloth",         5, 1255},
-  {11139, "Large Glowing Shard", "Enchanting",    1, 4996},
-  {3860,  "Mithril Bar",         "Metals",        2, 3000},
-  {2840,  "Copper Bar",          "Metals",       20, 1440},
-  {4304,  "Thick Leather",       "Leather",      10, 4197},
-  {8150,  "Deeprock Salt",       "Cooking quest", 5, 1908},
-  {3404,  "Buzzard Wing",        "Cooking quest", 2, 2144},
-  {3821,  "Goldthorn",           "Herbs",         2, 2378},
-  {3358,  "Khadgar's Whisker",   "Herbs",         2,  528},
-  {2453,  "Bruiseweed",          "Herbs",         3,  383},
-}
+-- New installs start with an empty portfolio (v0.9.1). Before that, every
+-- install was given the author's own starting positions as "seed" trades;
+-- installs created after the author's own (seeded after SEED_CUTOFF) have
+-- those removed once at login, see RemoveStraySeeds.
+local SEED_CUTOFF = 1794200000 -- 2026-11-09
 
 -- Categories for items that are not in the seed list but are known.
 local KNOWN_CATEGORIES = {
@@ -86,21 +77,41 @@ local function InitDB()
   db.loans     = db.loans or {}      -- v0.5: gold borrowed from other players (see ns.AddLoan)
   db.loanFees  = db.loanFees or 0    -- v0.5: total fees paid on repaid loans, copper
 
-  if not db.seeded then
-    local now = time()
-    for _, s in ipairs(SEED) do
-      local id, name, cat, qty, cost = s[1], s[2], s[3], s[4], s[5]
-      if not db.positions[id] then
-        db.positions[id] = {name = name, category = cat, qty = qty, cost = cost, realized = 0}
-        table.insert(db.trades, {
-          t = now, type = "seed", itemID = id, name = name, qty = qty,
-          unit = Round(cost / qty), gross = cost, cut = 0, deposit = 0,
-        })
-      end
-    end
-    db.seeded = now
-  end
+  -- when tracking started: purchases clicked before this are baseline
+  if not db.seeded then db.seeded = time() end
   ns.db = db
+  ns.RemoveStraySeeds()
+end
+
+-- v0.9.1: take the author's starting positions back out of installs that were
+-- given them (seeded after SEED_CUTOFF). Each "seed" trade's qty and cost come
+-- off its position; a position left empty with no other trades is dropped.
+function ns.RemoveStraySeeds()
+  local db = ns.db
+  if not db or db.unseeded or (db.seeded or 0) < SEED_CUTOFF then return end
+  local kept, removed, other = {}, 0, {}
+  for _, tr in ipairs(db.trades) do
+    if tr.type == "seed" then
+      local p = tr.itemID and db.positions[tr.itemID]
+      if p then
+        p.qty = math.max(0, (p.qty or 0) - (tr.qty or 0))
+        p.cost = math.max(0, (p.cost or 0) - (tr.gross or 0))
+        if p.qty == 0 then p.cost = 0 end
+      end
+      removed = removed + 1
+    else
+      kept[#kept + 1] = tr
+      if tr.itemID then other[tr.itemID] = true end
+    end
+  end
+  db.trades = kept
+  if removed > 0 then
+    for id, p in pairs(db.positions) do
+      if (p.qty or 0) == 0 and (p.realized or 0) == 0 and not other[id] then db.positions[id] = nil end
+    end
+    Print(removed .. " placeholder positions from an earlier version removed from your portfolio.")
+  end
+  db.unseeded = time()
 end
 
 local function GetItemNameSafe(itemID)

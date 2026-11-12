@@ -349,7 +349,7 @@ values are in **copper**. Times are Unix epoch seconds (`time()`), and days are 
 ```lua
 LedgerDB = {
   version = 1,
-  seeded = 1762570000,          -- when the seed positions were created
+  seeded = 1762570000,          -- when tracking started (purchases clicked before it are baseline)
   mailBaselined = 1762570100,   -- first complete inbox read (see "First run")
   lastSnap = 1762570200,        -- last price snapshot
   realized = 292,               -- total realized P/L, copper
@@ -360,7 +360,7 @@ LedgerDB = {
   },
 
   trades = {                    -- append-only, chronological
-    { t=..., type="seed", itemID=4338, name="Mageweave Cloth", qty=6, unit=798, gross=4788, cut=0, deposit=0 },
+    { t=..., type="buy", itemID=2840, name="Copper Bar", qty=20, unit=72, gross=1440, cut=0, deposit=0 },
     { t=..., type="buy",  itemID=3860, name="Mithril Bar", qty=2, unit=1500, gross=3000, cut=0, deposit=0,
       invoiceKey="buyer|Mithril Bar|...|1765162000", seller="Name", mailT=..., raw={...},
       clickTotal=3000,          -- optional: matched observed purchase
@@ -370,7 +370,7 @@ LedgerDB = {
       countIdx=11, raw={...} },  -- optional: fixed="money", grossRaw, qtyGuess, untracked
     { t=..., type="consume", itemID=8150, name="Deeprock Salt", qty=5, basis=1908, gross=0, cut=0, deposit=0 },
   },
-  -- type is one of "seed" | "buy" | "sell" | "consume". To rebuild positions, replay them in order
+  -- type is one of "seed" (pre-0.9.1 only) | "buy" | "sell" | "consume". To rebuild positions, replay them in order
   -- with average cost. "seed" behaves like "buy"; "consume" removes `basis` with no proceeds.
 
   prices = {                    -- per-item daily history, last 21 days, oldest first
@@ -432,13 +432,15 @@ In `raw`, a nil return is stored as `false`. The order follows `GetInboxInvoiceI
 itemName, playerName, bid, buyout, deposit, consignment (AH cut), then client-specific fields
 (moneyDelay, etherealDelay, count, ...).
 
-Tracked items are every key in `positions`. That's the seed list plus anything Ledger has seen bought.
+Tracked items are every key in `positions`: anything Ledger has seen bought. A new install starts empty
+(v0.9.1; earlier versions gave every install the author's starting positions, and v0.9.1 removes them once
+at login from any install created after the author's own).
 
 ## Test plan (in game)
 
 1. Log in. There should be no Lua error, and `/ledger help` should print the commands. (Turn on Lua errors
    with `/console scriptErrors 1` if needed.)
-2. `/ledger`. The window should list the 11 seed positions with the expected qty and avg cost. Prices show
+2. `/ledger`. On a new install the portfolio is empty until you buy something on the AH. Prices show
    "no data" until Auctionator has prices. Visit the AH, run an Auctionator scan, then `/ledger snap`.
 3. Open your mailbox once. Any AH invoices already there should appear as "baseline: ... not recorded".
 4. Buy **one cheap stack** of something on the AH (ideally a tracked item, e.g. 1 Bruiseweed). Note the exact
