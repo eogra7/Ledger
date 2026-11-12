@@ -40,9 +40,8 @@ names, gold, trades or loans. The repo is public. Test data must be made up.
 Each pull request's **Test** run also builds an installable zip, packaged exactly like a release:
 
 1. Open the pull request's **Checks** tab, then the **Test** run.
-2. Under **Artifacts**, download **Ledger-test-build** (you need to be signed in to GitHub). It's a zip that
-   contains `Ledger-<version>.zip`. Unzip it once to get that inner zip.
-3. Delete your `Interface\AddOns\Ledger` folder, unzip the inner zip into `Interface\AddOns\`, and `/reload`.
+2. Under **Artifacts**, download the `Ledger-<version>-forever.zip` (you need to be signed in to GitHub).
+3. Delete your `Interface\AddOns\Ledger` folder, unzip the download into `Interface\AddOns\`, and `/reload`.
 4. Check what the PR changed, plus a quick look at each tab. The numbered **Test steps** in the README cover
    most features.
 

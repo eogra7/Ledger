@@ -43,6 +43,8 @@ jobs:
       - name: Attach the zip to this run
         uses: actions/upload-artifact@v7
         with:
-          name: Ledger-test-build
           path: .release/*.zip
+          include-hidden-files: true # .release/ is a dot folder
+          archive: false             # upload the add-on zip as-is (no zip inside a zip)
+          if-no-files-found: error
           retention-days: 14
