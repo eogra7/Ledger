@@ -9,11 +9,12 @@ for after the AH cut, profit per craft and per hour, and the vendor floor.*
 
 ## Install
 
-Download `Ledger-vX.Y.Z.zip` from the [latest release](https://github.com/eogra7/Ledger/releases/latest) and
+Download `Ledger-vX.Y.Z-forever.zip` from the [latest release](https://github.com/eogra7/Ledger/releases/latest) and
 unzip it into `World of Warcraft\_forever_\Interface\AddOns\`, so you have `AddOns\Ledger\Ledger.toc`.
 Optional, but Ledger is much more useful with them: AuctionDB or Auctionator (prices; Auctionator also for
 shopping lists) and GearQuestForever (recipes you haven't learned yet). Open your profession window once so
-Ledger records your recipes.
+Ledger records your recipes. Untested alphas (`vX.Y.Z-alpha.N`) are also on the
+[releases page](https://github.com/eogra7/Ledger/releases) for anyone who wants to try changes early.
 
 Contributing: pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for the tests
 (`lua tests/run.lua`), how to try a pull request's build in game, and how releases are made.

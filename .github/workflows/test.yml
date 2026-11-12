@@ -1,22 +1,36 @@
-# Runs on every pull request and push to main:
-#   test  - syntax-checks every Lua file and runs tests/run.lua on Lua 5.1 (the game's version)
-#   build - packages the add-on exactly like a release (nothing is published) and attaches
-#           the zip to the run, so a PR can be installed and tried in game before merging
-name: Test
+# Required checks for every pull request (main is protected on these job names):
+#   test     - syntax-checks every Lua file, runs tests/run.lua on Lua 5.1 (the game's
+#              version) and the release-script tests
+#   build    - packages the add-on like a release (nothing is published) and attaches
+#              the zip to the run, so a PR can be installed and tried in game first
+#   pr-title - the PR title is a Conventional Commit ("fix(craft): ..."); it becomes
+#              the squash-merge commit that decides the next version
+#   review   - passes for the maintainer's own PRs; anyone else's needs the
+#              maintainer's approval of the latest commit
+name: Checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
   push:
     branches: [main]
 
 permissions:
   contents: read
+  pull-requests: read
+
+env:
+  MAINTAINER: eogra7
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: leafo/gh-actions-lua@v13
         with:
@@ -25,8 +39,14 @@ jobs:
       - name: Syntax check
         run: luac -p *.lua tests/*.lua
 
-      - name: Tests
+      - name: Add-on tests
         run: lua tests/run.lua
+
+      - name: Release script tests
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name ci
+          python3 .github/scripts/test_release.py
 
   build:
     runs-on: ubuntu-latest
@@ -34,6 +54,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Changelog since the last release
+        run: python3 .github/scripts/release.py preview
 
       - name: Package (no upload)
         uses: BigWigsMods/packager@v2
@@ -48,3 +71,49 @@ jobs:
           archive: false             # upload the add-on zip as-is (no zip inside a zip)
           if-no-files-found: error
           retention-days: 14
+
+  pr-title:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            docs
+            ci
+            test
+            refactor
+            style
+            build
+            chore
+            revert
+
+  review:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maintainer's PR, or approved by the maintainer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$AUTHOR" = "$MAINTAINER" ]; then
+            echo "Opened by the maintainer."
+            exit 0
+          fi
+          state=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+            --jq "[.[] | select(.user.login == \"$MAINTAINER\" and .state != \"COMMENTED\")] | last | (.state // \"\") + \" \" + (.commit_id // \"\")")
+          if [ "$state" = "APPROVED $HEAD" ]; then
+            echo "Approved by $MAINTAINER."
+            exit 0
+          fi
+          echo "::error::Waiting for $MAINTAINER to review and approve the latest commit."
+          exit 1

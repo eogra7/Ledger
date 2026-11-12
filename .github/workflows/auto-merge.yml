@@ -1,0 +1,48 @@
+# The maintainer's own pull requests merge themselves (squash) as soon as every
+# check passes. Everyone else's wait for the maintainer to review and merge.
+# A merge made with GITHUB_TOKEN doesn't trigger other workflows, so this then
+# starts the Release workflow (alpha) itself.
+name: Auto-merge
+
+on:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+env:
+  MAINTAINER: eogra7
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'eogra7' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Merge
+        id: merge
+        run: |
+          pr=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,author,isDraft,headRefOid \
+            --jq ".[] | select(.author.login == \"$MAINTAINER\" and (.isDraft | not) and .headRefOid == \"$SHA\") | .number")
+          if [ -z "$pr" ]; then
+            echo "No open, non-draft PR by $MAINTAINER at $SHA."
+            exit 0
+          fi
+          gh pr merge "$pr" -R "$REPO" --squash --delete-branch --match-head-commit "$SHA"
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start the alpha release
+        if: steps.merge.outputs.merged == 'true'
+        run: gh workflow run release.yml -R "$REPO" --ref main -f mode=alpha

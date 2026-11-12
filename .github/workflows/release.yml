@@ -1,20 +1,67 @@
-# Push a tag like v0.9.0 to build Ledger-v0.9.0.zip and publish it as a GitHub
-# release. When the CF_API_KEY secret is set and Ledger.toc has an
-# "## X-Curse-Project-ID:" line, the same zip is uploaded to CurseForge too.
+# Alpha: every merge to main that has a feat/fix/perf (or breaking) commit since the
+#        last alpha gets the next version from Conventional Commits and is published
+#        as a GitHub pre-release vX.Y.Z-alpha.N (and to CurseForge's alpha channel
+#        once that's set up). Runs on push to main, or when Auto-merge starts it.
+# Promote: run this workflow by hand with mode "promote" once an alpha has been
+#        tested in game. It needs approval in the "release" environment, then tags
+#        the same commit vX.Y.Z and publishes it as a full release.
 name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "alpha = release main as the next alpha if needed; promote = publish a tested alpha as a release"
+        type: choice
+        options: [promote, alpha]
+        default: promote
+      alpha:
+        description: "promote: the alpha tag to release, e.g. v0.10.0-alpha.2 (blank = the newest alpha)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
+  alpha:
+    if: github.event_name == 'push' || inputs.mode == 'alpha'
     runs-on: ubuntu-latest
+    env:
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Next version
+        id: v
+        run: python3 .github/scripts/release.py alpha
+
+      - name: Tag
+        if: steps.v.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Package and publish
+        if: steps.v.outputs.release == 'true'
+        uses: BigWigsMods/packager@v2
+
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'promote'
+    runs-on: ubuntu-latest
+    environment: release
     env:
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
@@ -23,15 +70,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check the tag matches Ledger.toc
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Version
+        id: v
+        env:
+          ALPHA: ${{ inputs.alpha }}
+        run: python3 .github/scripts/release.py promote "$ALPHA"
+
+      - name: Tag the alpha's commit
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          SHA: ${{ steps.v.outputs.sha }}
         run: |
-          toc=$(grep -m1 '^## Version:' Ledger.toc | sed 's/^## Version: *//' | tr -d '\r')
-          tag=${GITHUB_REF_NAME#v}
-          if [ "$toc" != "$tag" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match Ledger.toc version $toc"
-            exit 1
-          fi
+          mv CHANGELOG.md /tmp/CHANGELOG.md
+          git checkout --quiet "$SHA"
+          mv /tmp/CHANGELOG.md CHANGELOG.md
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Package and publish
         uses: BigWigsMods/packager@v2
