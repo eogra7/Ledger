@@ -2,6 +2,11 @@
 
 A small, **read-only** auction-house portfolio tracker for WoW: Forever (`## Interface: 16001`).
 
+![Ledger's Crafting tab next to the Engineering window: profit, margin, vendor profit per hour and floor price for each recipe](screenshots/crafting.png)
+
+*The Crafting tab: what each recipe costs to make (crafting its parts when that's cheaper), what it sells
+for after the AH cut, profit per craft and per hour, and the vendor floor.*
+
 ## Install
 
 Download `Ledger-vX.Y.Z.zip` from the [latest release](https://github.com/eogra7/Ledger/releases/latest) and

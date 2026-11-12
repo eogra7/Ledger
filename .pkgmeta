@@ -2,3 +2,4 @@ package-as: Ledger
 
 ignore:
   - "*.zip"
+  - screenshots
