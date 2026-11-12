@@ -1,5 +1,13 @@
 package-as: Ledger
 
+# CHANGELOG.md is written by .github/scripts/release.py when a build is made
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - "*.zip"
   - screenshots
+  - tests
+  - .github
+  - CONTRIBUTING.md

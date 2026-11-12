@@ -2,7 +2,7 @@
 ## Title: Ledger
 ## Notes: Read-only auction house portfolio tracker (purchases, sales, prices, holdings, P/L). Prices from AHDB and/or Auctionator
 ## Author: Polaris Minties
-## Version: 0.9.1
+## Version: @project-version@
 ## OptionalDeps: Auctionator, AuctionDB, GearQuestForever
 ## SavedVariables: LedgerDB
 ## IconTexture: Interface\Icons\INV_Misc_Book_11
