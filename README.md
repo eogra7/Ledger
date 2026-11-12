@@ -15,8 +15,8 @@ Optional, but Ledger is much more useful with them: AuctionDB or Auctionator (pr
 shopping lists) and GearQuestForever (recipes you haven't learned yet). Open your profession window once so
 Ledger records your recipes.
 
-Releases: bump `## Version:` in `Ledger.toc`, commit, and push a matching tag (`git tag v0.9.0 && git push
---tags`). The Release workflow builds the zip with the BigWigs packager and attaches it to a GitHub release.
+Contributing: pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for the tests
+(`lua tests/run.lua`), how to try a pull request's build in game, and how releases are made.
 
 ## What it does
 

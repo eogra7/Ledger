@@ -1,0 +1,48 @@
+# Runs on every pull request and push to main:
+#   test  - syntax-checks every Lua file and runs tests/run.lua on Lua 5.1 (the game's version)
+#   build - packages the add-on exactly like a release (nothing is published) and attaches
+#           the zip to the run, so a PR can be installed and tried in game before merging
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: "5.1.5"
+
+      - name: Syntax check
+        run: luac -p *.lua tests/*.lua
+
+      - name: Tests
+        run: lua tests/run.lua
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Package (no upload)
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+
+      - name: Attach the zip to this run
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ledger-test-build
+          path: .release/*.zip
+          retention-days: 14

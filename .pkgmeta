@@ -3,3 +3,5 @@ package-as: Ledger
 ignore:
   - "*.zip"
   - screenshots
+  - tests
+  - CONTRIBUTING.md
