@@ -98,8 +98,7 @@ mf:SetScript("OnEvent", function()
       end
       local names = {}
       for id, price in pairs(used) do
-        local ok, name = pcall(GetItemInfo, id)
-        names[#names + 1] = ((ok and name) or ("item " .. id)) .. " " .. ns.Money(price)
+        names[#names + 1] = (ns.ItemName(id) or ("item " .. id)) .. " " .. ns.Money(price)
       end
       if #names > 0 then
         table.sort(names)
@@ -262,7 +261,7 @@ function ns.CaptureRecipes()
   if not db then return 0 end
   local list, prof, rank = ReadModern()
   if not list or #list == 0 then list, prof, rank = ReadClassic() end
-  if not list or #list == 0 or not prof then return 0 end
+  if not list or #list == 0 or not prof or prof == "" then return 0 end
   db.recipes = db.recipes or {}
   db.recipeProfs = db.recipeProfs or {}
   local nLearned = 0
@@ -957,12 +956,8 @@ end
 
 -- Name (or clickable link) for a recipe row.
 local function RowLabel(r)
-  if GetItemInfo then
-    local ok, name, link = pcall(GetItemInfo, r.id)
-    if ok and (link or name) then return link or name end
-  end
-  if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, r.id) end
-  return r.name or ("item " .. r.id)
+  local name, link = ns.ItemInfo(r.id)
+  return link or name or r.name or ("item " .. r.id)
 end
 
 -- mode nil: recipes you know. mode "new": recipes you haven't learned yet.
