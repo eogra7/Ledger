@@ -130,12 +130,15 @@ local cantLoad = {}     -- [itemID] = true: the client said it can't load this i
 function ns.ItemInfo(itemID)
   itemID = tonumber(itemID)
   if not itemID then return nil end
-  local getInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
-  if getInfo then
-    local ok, name, link, _, _, _, _, _, _, _, _, sell = pcall(getInfo, itemID)
-    if ok and name then
-      waitingFor[itemID] = nil
-      return name, link, sell, true
+  -- C_Item first: on some clients the global GetItemInfo returns nothing even
+  -- for items that are loaded (PR #3)
+  for _, getInfo in ipairs({C_Item and C_Item.GetItemInfo or false, GetItemInfo or false}) do
+    if getInfo then
+      local ok, name, link, _, _, _, _, _, _, _, _, sell = pcall(getInfo, itemID)
+      if ok and name then
+        waitingFor[itemID] = nil
+        return name, link, sell, true
+      end
     end
   end
   if not cantLoad[itemID] and C_Item and C_Item.RequestLoadItemDataByID then
@@ -1034,7 +1037,8 @@ function ns.BankValue(includeBags)
   if includeBags then add(db.bagItems) end
   db.vendor = db.vendor or {}
   for id, e in pairs(merged) do
-    local r = {id = id, n = e.n, bound = e.bound, savedName = e.name}
+    -- name: the client's, else the one saved from the bank slot's link
+    local r = {id = id, n = e.n, bound = e.bound, name = GetItemNameSafe(id) or e.name}
     local vend = db.vendor[id]
     if vend == nil then
       vend = SellPrice(id)

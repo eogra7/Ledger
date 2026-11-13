@@ -1191,7 +1191,7 @@ local function RefreshBank()
 
   local missingName = d.loading > 0
   for _, r in ipairs(d.rows) do
-    local name = ItemNameLink(r.id) or r.savedName
+    local name = ItemNameLink(r.id) or r.name
     if not name then missingName = true end
     r.name = name or ("item " .. r.id)
   end

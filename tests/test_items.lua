@@ -65,13 +65,13 @@ function tests.bank_keeps_names_from_slot_links(T)
   ns.CountHoldings()
   local d = ns.BankValue(false)
   local names = {}
-  for _, r in ipairs(d.rows) do names[r.id] = r.savedName end
+  for _, r in ipairs(d.rows) do names[r.id] = r.name end
   T.eq(names[2841], "Bronze Bar", "unloaded item named from its link")
   T.eq(names[4306], "Silk Cloth", "loaded item")
   -- names survive a reload, when the client has loaded nothing yet
   local again = W.load({db = ns.db, unloaded = {[2841] = true}})
   for _, r in ipairs(again.BankValue(false).rows) do
-    if r.id == 2841 then T.eq(r.savedName, "Bronze Bar", "after reload") end
+    if r.id == 2841 then T.eq(r.name, "Bronze Bar", "after reload") end
   end
 end
 
