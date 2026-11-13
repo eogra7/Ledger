@@ -90,14 +90,26 @@ jobs:
 
       - name: Tag the alpha's commit
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.v.outputs.tag }}
           SHA: ${{ steps.v.outputs.sha }}
         run: |
           mv CHANGELOG.md /tmp/CHANGELOG.md
           git checkout --quiet "$SHA"
           mv /tmp/CHANGELOG.md CHANGELOG.md
-          git tag "$TAG"
-          git push origin "$TAG"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG already points at $SHA."
+          else
+            git tag "$TAG"
+            if ! git push origin "$TAG"; then
+              echo "::error::GitHub refused the tag push. This happens when the workflow files changed after the alpha: the Actions token may not create refs that differ from main's workflows. Push it yourself: git push origin $SHA:refs/tags/$TAG , then run promote again."
+              exit 1
+            fi
+          fi
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$TAG is already released."
+            exit 1
+          fi
           # the alpha's tag is on the same commit; drop it here (not on GitHub)
           # so the packager builds the release, not the alpha again
           for t in $(git tag --points-at HEAD); do

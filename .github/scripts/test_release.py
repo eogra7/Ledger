@@ -118,11 +118,25 @@ class PromoteTests(unittest.TestCase):
         self.assertIn("- b", out["_log"])
         self.assertNotIn("not in the alpha", out["_log"])
 
-    def test_refuses_released_or_unknown(self):
+    def test_tag_already_on_the_alpha_is_fine(self):
         r = Repo()
         r.commit("feat: a")
-        r.tag("v0.10.0-alpha.1")
+        r.tag("v0.9.1")
+        r.commit("fix: b")
+        r.tag("v0.9.2-alpha.1")
+        r.tag("v0.9.2")
+        out = r.run("promote", "v0.9.2-alpha.1")
+        self.assertEqual(out["_code"], 0, out["_err"])
+        self.assertEqual(out["tag"], "v0.9.2")
+        self.assertIn("- b", out["_log"])
+        self.assertNotIn("- a", out["_log"])
+
+    def test_refuses_tag_elsewhere_or_unknown_alpha(self):
+        r = Repo()
+        r.commit("feat: a")
         r.tag("v0.10.0")
+        r.commit("fix: b")
+        r.tag("v0.10.0-alpha.1")
         self.assertNotEqual(r.run("promote", "v0.10.0-alpha.1")["_code"], 0)
         self.assertNotEqual(r.run("promote", "v9.9.9-alpha.1")["_code"], 0)
 

@@ -80,3 +80,5 @@ Versions are worked out from the commit titles (SemVer), so nobody edits a versi
   workflow**, keep mode **promote**, and optionally name the alpha (blank = the newest). The maintainer
   approves the run in the **release** environment; that approval is the "tested" sign-off. The same commit is
   tagged `v0.10.0` and published as a full release, with a changelog of everything since the last release.
+  If the workflow files changed after that alpha, GitHub won't let the workflow create the tag; the run
+  says so. The maintainer then pushes it (`git push origin <alpha commit>:refs/tags/v0.10.0`) and runs promote again.

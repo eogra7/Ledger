@@ -156,11 +156,18 @@ def cmd_promote(alpha_tag=None):
     else:
         sys.exit("no alpha to promote")
     tag = alpha_tag.split("-alpha.")[0]
+    sha = git("rev-list", "-n", "1", alpha_tag)
+    # the tag may already exist on the alpha's commit (pushed by hand when
+    # GitHub won't let the workflow create it); anywhere else it's a release
     if tag in git("tag", "--list", tag).splitlines():
-        sys.exit(f"{tag} is already released")
-    _, stable_tag = last_stable()
+        if git("rev-list", "-n", "1", tag) != sha:
+            sys.exit(f"{tag} already exists on another commit")
+        stable = [t for _, t in tags(STABLE) if t != tag]
+        stable_tag = stable[-1] if stable else None
+    else:
+        _, stable_tag = last_stable()
     write_changelog(changelog(f"Ledger {tag}", commits(stable_tag, alpha_tag)))
-    output(release="true", tag=tag, sha=git("rev-list", "-n", "1", alpha_tag))
+    output(release="true", tag=tag, sha=sha)
 
 
 def cmd_preview():
