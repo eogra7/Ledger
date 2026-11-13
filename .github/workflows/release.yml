@@ -98,6 +98,11 @@ jobs:
           mv /tmp/CHANGELOG.md CHANGELOG.md
           git tag "$TAG"
           git push origin "$TAG"
+          # the alpha's tag is on the same commit; drop it here (not on GitHub)
+          # so the packager builds the release, not the alpha again
+          for t in $(git tag --points-at HEAD); do
+            if [ "$t" != "$TAG" ]; then git tag -d "$t"; fi
+          done
 
       - name: Package and publish
         uses: BigWigsMods/packager@v2
