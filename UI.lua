@@ -734,12 +734,8 @@ local vNameRetry, vNameTries = false, 0
 
 -- name (and clickable link) if the client has the item loaded
 local function ItemNameLink(id)
-  if GetItemInfo then
-    local ok, name, link = pcall(GetItemInfo, id)
-    if ok and name then return name, link end
-  end
-  if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
-  return nil, nil
+  local name, link = ns.ItemInfo(id)
+  return name, link
 end
 
 -- Alt-click: AuctionDB's price history graph for the item (same as Alt-clicking it in your bags). true if shown.
@@ -1195,7 +1191,7 @@ local function RefreshBank()
 
   local missingName = d.loading > 0
   for _, r in ipairs(d.rows) do
-    local name = ItemNameLink(r.id)
+    local name = ItemNameLink(r.id) or r.savedName
     if not name then missingName = true end
     r.name = name or ("item " .. r.id)
   end
@@ -1783,7 +1779,7 @@ local function RefreshCraft()
   else
     local profs = {}
     for name, info in pairs(db.recipeProfs or {}) do
-      if profShown == "All" or name == profShown then
+      if name ~= "" and (profShown == "All" or name == profShown) then
         profs[#profs + 1] = name .. (info.rank and (" " .. info.rank) or "")
       end
     end

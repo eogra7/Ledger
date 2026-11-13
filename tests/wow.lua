@@ -46,11 +46,26 @@ function W.load(opts)
   end}
   function UnitFactionGroup() return "Alliance" end
   function GetTime() return W.clock end
-  function GetItemInfo(id)
+  -- opts.unloaded = {[id] = true}: the client hasn't loaded these yet (W.deliver loads one)
+  W.unloaded, W.requested = opts.unloaded or {}, {}
+  local function info(id)
     local it = W.ITEMS[id]
-    if not it then return nil end
-    return it[1], "item:" .. id, nil, nil, nil, nil, nil, nil, nil, nil, it[2]
+    if not it or W.unloaded[id] then return nil end
+    return it[1], "|Hitem:" .. id .. "|h[" .. it[1] .. "]|h", nil, nil, nil, nil, nil, nil, nil, nil, it[2]
   end
+  GetItemInfo = (not opts.noGlobalGetItemInfo) and info or nil
+  C_Item = {GetItemInfo = info,
+    RequestLoadItemDataByID = function(id) W.requested[id] = (W.requested[id] or 0) + 1 end}
+  -- bank/bags: opts.bank = {{id, count}, ...} in one bank bag (id -1)
+  C_Container = {
+    GetContainerNumSlots = function(bag) return bag == -1 and #(opts.bank or {}) or 0 end,
+    GetContainerItemInfo = function(bag, slot)
+      local e = bag == -1 and (opts.bank or {})[slot]
+      if not e then return nil end
+      local it = W.ITEMS[e[1]] or {"Unknown"}
+      return {itemID = e[1], stackCount = e[2], hyperlink = "|Hitem:" .. e[1] .. "|h[" .. it[1] .. "]|h"}
+    end}
+  Enum = nil
   function GetItemCount() return 0 end
   SlashCmdList = {}
   Auctionator, GearQuest, AuctionDB = nil, opts.gearquest, nil
@@ -72,6 +87,12 @@ function W.fire(event, ...)
   for _, f in ipairs(W.frames) do
     if f.ev[event] and f.fn then f.fn(f, event, ...) end
   end
+end
+
+-- The client finishes loading an item (or fails to: success = false).
+function W.deliver(id, success)
+  if success ~= false then W.unloaded[id] = nil end
+  W.fire("GET_ITEM_INFO_RECEIVED", id, success ~= false)
 end
 
 function W.runTimers()

@@ -79,6 +79,11 @@ local function InitDB()
 
   -- when tracking started: purchases clicked before this are baseline
   if not db.seeded then db.seeded = time() end
+  -- v0.10: a profession window with no name was once recorded as profession ""
+  if db.recipeProfs then db.recipeProfs[""] = nil end
+  for id, r in pairs(db.recipes or {}) do
+    if type(r) == "table" and r.prof == "" then db.recipes[id] = nil end
+  end
   ns.db = db
   ns.RemoveStraySeeds()
 end
@@ -114,17 +119,48 @@ function ns.RemoveStraySeeds()
   db.unseeded = time()
 end
 
-local function GetItemNameSafe(itemID)
+-- Item details. The client returns nothing for an item it hasn't loaded yet
+-- and fetches it from the server; GET_ITEM_INFO_RECEIVED (see Events) then
+-- redraws the window, so names and vendor prices fill in on their own.
+local waitingFor = {}   -- [itemID] = true: asked the client for it, not loaded yet
+local cantLoad = {}     -- [itemID] = true: the client said it can't load this item
+
+-- name, link, sellPrice (copper), full. full = false when only the name is known
+-- (no link or sell price yet); all nil when nothing is loaded.
+function ns.ItemInfo(itemID)
+  itemID = tonumber(itemID)
+  if not itemID then return nil end
+  local getInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
+  if getInfo then
+    local ok, name, link, _, _, _, _, _, _, _, _, sell = pcall(getInfo, itemID)
+    if ok and name then
+      waitingFor[itemID] = nil
+      return name, link, sell, true
+    end
+  end
+  if not cantLoad[itemID] and C_Item and C_Item.RequestLoadItemDataByID then
+    waitingFor[itemID] = true
+    pcall(C_Item.RequestLoadItemDataByID, itemID)
+  end
   if C_Item and C_Item.GetItemNameByID then
     local ok, name = pcall(C_Item.GetItemNameByID, itemID)
-    if ok and name then return name end
-  end
-  if GetItemInfo then
-    local ok, name = pcall(GetItemInfo, itemID)
-    if ok and name then return name end
+    if ok and name then return name, nil, nil, false end
   end
   return nil
 end
+
+function ns.ItemName(itemID) return (ns.ItemInfo(itemID)) end
+
+-- GET_ITEM_INFO_RECEIVED: true when the window should redraw for this item.
+function ns.ItemInfoReceived(itemID, success)
+  itemID = tonumber(itemID)
+  if not (itemID and waitingFor[itemID]) then return false end
+  waitingFor[itemID] = nil
+  if success == false then cantLoad[itemID] = true; return false end
+  return true
+end
+
+local function GetItemNameSafe(itemID) return ns.ItemName(itemID) end
 
 local function ItemIDFromLink(link)
   if type(link) ~= "string" then return nil end
@@ -632,6 +668,9 @@ local function SnapshotContainers(indexes)
           items[info.itemID] = e
           e.n = e.n + (info.stackCount or 1)
           if info.isBound then e.bound = true end
+          -- the slot's link carries the name even before the item data is loaded
+          local name = type(info.hyperlink) == "string" and info.hyperlink:match("%[(.-)%]")
+          if name and name ~= "" then e.name = name end
         end
       end
     end
@@ -948,10 +987,10 @@ function ns.OnMoneyChanged()
   local each = floor(got / s.count)
   local db = ns.db
   local known = db.vendor and db.vendor[s.id]
-  if known == nil then known = select(12, pcall(GetItemInfo, s.id)) end -- pcall's ok, then 11 returns
+  if known == nil then known = select(3, ns.ItemInfo(s.id)) end
   if known ~= each then
     ns.SetVendorFix(s.id, each)
-    local _, _, link = pcall(GetItemInfo, s.id)
+    local _, link = ns.ItemInfo(s.id)
     Print(string.format("%s: vendors pay %s each, not %s - vendor price corrected.",
       (type(link) == "string" and link) or ("item " .. s.id), ns.Money(each), ns.Money(tonumber(known))))
   end
@@ -961,13 +1000,8 @@ end
 local function SellPrice(itemID)
   local fix = ns.VendorFix(itemID)
   if fix ~= nil then return fix end
-  if not GetItemInfo then return nil end
-  -- GetItemInfo's 11th return is sellPrice; pcall adds "ok" in front.
-  local ok, name, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, itemID)
-  if ok and name then return tonumber(sell) or 0 end
-  if C_Item and C_Item.RequestLoadItemDataByID then
-    pcall(C_Item.RequestLoadItemDataByID, itemID)
-  end
+  local _, _, sell, full = ns.ItemInfo(itemID)
+  if full then return tonumber(sell) or 0 end
   return nil
 end
 ns.SellPrice = SellPrice
@@ -993,13 +1027,14 @@ function ns.BankValue(includeBags)
       merged[id] = m
       m.n = m.n + (e.n or 0)
       if e.bound then m.bound = true end
+      m.name = m.name or e.name
     end
   end
   add(bank)
   if includeBags then add(db.bagItems) end
   db.vendor = db.vendor or {}
   for id, e in pairs(merged) do
-    local r = {id = id, n = e.n, bound = e.bound}
+    local r = {id = id, n = e.n, bound = e.bound, savedName = e.name}
     local vend = db.vendor[id]
     if vend == nil then
       vend = SellPrice(id)
@@ -1167,12 +1202,8 @@ end
 
 -- Clickable item link when the client has the item loaded, else its name.
 local function ItemLabel(id)
-  if GetItemInfo then
-    local ok, name, link = pcall(GetItemInfo, id)
-    if ok and link then return link end
-    if ok and name then return name end
-  end
-  return GetItemNameSafe(id)
+  local name, link = ns.ItemInfo(id)
+  return link or name
 end
 
 -- quiet: print nothing when the list is empty (used after each scan).
@@ -1755,6 +1786,7 @@ local f = CreateFrame("Frame")
 local function Reg(ev) pcall(f.RegisterEvent, f, ev) end
 Reg("ADDON_LOADED")
 Reg("PLAYER_LOGIN")
+Reg("GET_ITEM_INFO_RECEIVED")
 
 local holdQueued = false
 local function QueueHoldings()
@@ -1767,8 +1799,21 @@ local function QueueHoldings()
   end)
 end
 
+-- item details arriving: one redraw for a burst of them
+local itemRedrawQueued = false
+local function QueueItemRedraw()
+  if itemRedrawQueued then return end
+  itemRedrawQueued = true
+  C_Timer.After(0.5, function()
+    itemRedrawQueued = false
+    if ns.RefreshUI then ns.RefreshUI() end
+  end)
+end
+
 f:SetScript("OnEvent", function(_, event, ...)
-  if event == "ADDON_LOADED" then
+  if event == "GET_ITEM_INFO_RECEIVED" then
+    if ns.ItemInfoReceived(...) then QueueItemRedraw() end
+  elseif event == "ADDON_LOADED" then
     if ... == addonName then InitDB() end
   elseif event == "PLAYER_LOGIN" then
     if not ns.db then InitDB() end

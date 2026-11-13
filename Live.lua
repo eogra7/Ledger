@@ -275,16 +275,7 @@ end
 
 local pendingShop   -- {name, t}
 
-local function ItemName(id)
-  local ok, name = pcall(GetItemInfo, id)
-  if ok and name then return name end
-  if C_Item and C_Item.GetItemNameByID then
-    local ok2, n2 = pcall(C_Item.GetItemNameByID, id)
-    if ok2 and n2 then return n2 end
-  end
-  if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
-  return nil
-end
+local function ItemName(id) return ns.ItemName(id) end
 
 -- Switches the AH to Auctionator's Shopping tab and searches list `name`.
 local function OpenShop(name)
