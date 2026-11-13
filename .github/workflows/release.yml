@@ -6,7 +6,8 @@
 #        packager won't build in a push run once a tag points at the commit.
 # Promote: run this workflow by hand with mode "promote" once an alpha has been
 #        tested in game. It needs approval in the "release" environment, then tags
-#        the same commit vX.Y.Z and publishes it as a full release.
+#        the same commit vX.Y.Z, publishes it as a full release, and deletes
+#        that version's alphas (vX.Y.Z-alpha.*), which it replaces.
 name: Release
 
 on:
@@ -118,3 +119,22 @@ jobs:
 
       - name: Package and publish
         uses: BigWigsMods/packager@v2
+
+      - name: Delete this version's alphas
+        # the release replaces them (same code); their releases, zips and tags go
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null
+          for t in $(git ls-remote --tags origin | sed "s#.*refs/tags/##"); do
+            case "$t" in "$TAG"-alpha.*) ;; *) continue ;; esac
+            n=${t#"$TAG"-alpha.}
+            [[ $n =~ ^[0-9]+$ ]] || continue
+            if gh release view "$t" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release delete "$t" -R "$GITHUB_REPOSITORY" --cleanup-tag -y
+            else
+              git push origin ":refs/tags/$t"
+            fi
+            echo "deleted $t"
+          done
