@@ -1,7 +1,9 @@
 # Alpha: every merge to main that has a feat/fix/perf (or breaking) commit since the
 #        last alpha gets the next version from Conventional Commits and is published
 #        as a GitHub pre-release vX.Y.Z-alpha.N (and to CurseForge's alpha channel
-#        once that's set up). Runs on push to main, or when Auto-merge starts it.
+#        once that's set up). A push to main (a merge done by hand) starts the
+#        alpha as a separate manual-style run, the way Auto-merge does: the
+#        packager won't build in a push run once a tag points at the commit.
 # Promote: run this workflow by hand with mode "promote" once an alpha has been
 #        tested in game. It needs approval in the "release" environment, then tags
 #        the same commit vX.Y.Z and publishes it as a full release.
@@ -24,14 +26,24 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
+  start-alpha:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the alpha release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run release.yml -R "${{ github.repository }}" --ref main -f mode=alpha
+
   alpha:
-    if: github.event_name == 'push' || inputs.mode == 'alpha'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'alpha'
     runs-on: ubuntu-latest
     env:
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
